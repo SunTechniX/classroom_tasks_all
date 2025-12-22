@@ -3,7 +3,12 @@ import json
 import sys
 import os
 import argparse
+from datetime import datetime
 from pathlib import Path
+
+# Добавляем tools/ в путь поиска модулей
+sys.path.insert(0, str(Path(__file__).parent))
+
 
 def extract_and_output_env():
     config_path = ".github/tasks.json"
@@ -19,9 +24,14 @@ def extract_and_output_env():
         print("⚠️ GITHUB_OUTPUT not set (running locally?)", file=sys.stderr)
         return
 
+    # Импортируем encode_result_for_classroom
+    from utils import encode_result_for_classroom
+
     with open(github_output, "a") as f:
         for task in config["tasks"]:
             task_id = task["id"]
+
+            # --- для Student Summary Actions ---
             path = f"./{task_id}_aggregated.txt"
             encoded = ""
             if os.path.exists(path):
@@ -30,22 +40,16 @@ def extract_and_output_env():
                 if "AGGREGATED_RESULT=" in content:
                     encoded = content.split("AGGREGATED_RESULT=", 1)[1].strip()
             f.write(f"{task_id}_aggregated={encoded}\n")
+            # === для Student Summary Actions ===
 
-    # Импортируем encode_result_for_classroom
-    from utils import encode_result_for_classroom
-
-    with open(github_output, "a") as f:
-        for task in config["tasks"]:
-            task_id = task["id"]
+            # --- для GitHub Classroom ---
             json_path = f"results/{task_id}.json"
-
             if os.path.exists(json_path):
                 with open(json_path, "r", encoding="utf-8") as fp:
                     data = json.load(fp)
                 score = sum(t.get("score", 0) for t in data["tests"])
             else:
                 score = 0
-
             max_score = task["max_score"]
 
             # 🆕 Формат, который ПОНИМАЕТ GitHub Classroom:
@@ -57,6 +61,7 @@ def extract_and_output_env():
 
             encoded = encode_result_for_classroom(classroom_result)
             f.write(f"{task_id}_classroom={encoded}\n")
+            # === для GitHub Classroom ===
 
 def generate_summary():
     config_path = ".github/tasks.json"
@@ -120,7 +125,8 @@ def generate_summary():
     summary.append("")
     summary.append(f"**GitHub Classroom: {total_score}/{max_total} баллов**")
     summary.append("")
-    summary.append("*Автоматическая проверка завершена* • $(date)")
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    summary.append(f"*Автоматическая проверка завершена* • {current_time}")
 
     # Запись в GITHUB_STEP_SUMMARY
     summary_file = os.environ.get("GITHUB_STEP_SUMMARY", "/dev/stdout")
