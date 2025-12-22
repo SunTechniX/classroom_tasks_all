@@ -31,6 +31,33 @@ def extract_and_output_env():
                     encoded = content.split("AGGREGATED_RESULT=", 1)[1].strip()
             f.write(f"{task_id}_aggregated={encoded}\n")
 
+    # Импортируем encode_result_for_classroom
+    from utils import encode_result_for_classroom
+
+    with open(github_output, "a") as f:
+        for task in config["tasks"]:
+            task_id = task["id"]
+            json_path = f"results/{task_id}.json"
+
+            if os.path.exists(json_path):
+                with open(json_path, "r", encoding="utf-8") as fp:
+                    data = json.load(fp)
+                score = sum(t.get("score", 0) for t in data["tests"])
+            else:
+                score = 0
+
+            max_score = task["max_score"]
+
+            # 🆕 Формат, который ПОНИМАЕТ GitHub Classroom:
+            classroom_result = {
+                "score": score,
+                "max_score": max_score,
+                "output": f"Student scored {score} out of {max_score}"
+            }
+
+            encoded = encode_result_for_classroom(classroom_result)
+            f.write(f"{task_id}_classroom={encoded}\n")
+
 def generate_summary():
     config_path = ".github/tasks.json"
     with open(config_path, "r", encoding="utf-8") as f:
